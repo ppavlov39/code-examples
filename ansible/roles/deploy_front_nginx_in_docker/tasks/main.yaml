@@ -1,0 +1,147 @@
+---
+
+  - name: Create directory for nginx files
+    file:
+      path: "{{ item.path }}"
+      state: directory
+      mode: '0755'
+      owner: root
+      group: root
+    with_items:
+    - { path: "/var/log/nginx/" }
+    - { path: "/opt/docker/nginx/" }
+    - { path: "/opt/docker/nginx/ssl/" }
+    - { path: "/opt/docker/nginx/ssl/certs/" }
+    - { path: "/opt/docker/nginx/ssl/private/" }
+    - { path: "/opt/docker/nginx/configs/" }
+    - { path: "/opt/docker/nginx/configs/sites-available/" }
+
+  - name: Create directory for nginx caches
+    file:
+      path: "{{ item.path }}"
+      state: directory
+      mode: '0777'
+      owner: some_user
+      group: www-data
+    with_items:
+    - { path: "/some_folder/cache" }
+    - { path: "/some_folder/cache_img" }
+
+  - name: Put docker-compose file
+    template:
+      src: docker-compose.yml.j2
+      dest: /opt/docker/nginx/docker-compose.yml
+      owner: root
+      group: root
+      mode: '0644'
+    diff: yes
+    tags:
+    - update-docker-compose
+
+  - name: Put self signed certificates 
+    copy:
+      src: "{{ item.src }}"
+      dest: "{{ item.dest }}"
+      owner: root
+      group: root
+      mode: 0600
+    with_items:
+      - { src: 'ssl-cert-snakeoil.key', dest: '/opt/docker/nginx/ssl/private/ssl-cert-snakeoil.key' }
+      - { src: 'ssl-cert-snakeoil.pem', dest: '/opt/docker/nginx/ssl/certs/ssl-cert-snakeoil.pem' }
+    tags:
+      - update-certificates
+
+  - name: Put logrotate config
+    copy:
+      src: nginx.logrotate.conf
+      dest: /etc/logrotate.d/nginx-in-docker
+      owner: root
+      group: root
+      mode: 0644
+    diff: yes
+    tags:
+      - update-logrotate-config
+
+  - name: Put mime.types
+    copy:
+      src: configs/nginx/common/mime.types
+      dest: /opt/docker/nginx/configs/mime.types
+      owner: root
+      group: root
+      mode: '0644'
+    diff: yes
+    register: update_nginx_config_status
+    tags:
+    - update-nginx-config
+    notify:
+    - Reload nginx
+
+  - name: Put nginx.conf
+    template:
+      src: configs/nginx/common/nginx.conf.j2
+      dest: /opt/docker/nginx/configs/nginx.conf
+      backup: yes
+      owner: root
+      group: root
+      mode: '0644'
+    diff: yes
+    register: update_nginx_config_status
+    tags:
+    - update-nginx-config
+    notify:
+    - Reload nginx
+
+  - name: Put nginx default config
+    template:
+      src: configs/nginx/front/default.j2
+      dest: /opt/docker/nginx/configs/sites-available/default
+      backup: yes
+      owner: root
+      group: root
+      mode: '0644'
+    diff: yes
+    register: update_nginx_default_config_status
+    tags:
+    - update-nginx-config
+    notify:
+    - Reload nginx
+
+  - name: Put nginx tcp proxy config
+    template:
+      src: configs/nginx/front/front-proxy.conf.j2
+      dest: /opt/docker/nginx/configs/sites-available/front-proxy.conf
+      backup: yes
+      owner: root
+      group: root
+      mode: '0644'
+    diff: yes
+    tags:
+    - update-nginx-config
+    when: ansible_host == 'some_host'
+    notify:
+    - Reload nginx
+
+  - name: Test nginx config
+    shell:
+      chdir: /opt/docker/nginx/
+      cmd: "/usr/local/bin/docker-compose exec nginx nginx -c /etc/nginx/configs/nginx.conf -t"
+    register: nginx_config_status
+    when: update_nginx_config_status.changed or update_nginx_default_config_status.changed 
+    tags:
+    - update-nginx-config
+
+  - name: Check nginx config result
+    ignore_errors: yes
+    debug: 
+      msg: "{{ nginx_config_status.stdout_lines }}"
+    when: update_nginx_config_status.changed or update_nginx_default_config_status.changed 
+    tags:
+    - update-nginx-config
+
+  - name: Up services
+    shell:
+      chdir: /opt/docker/nginx/
+      cmd: "/usr/local/bin/docker-compose up -d"
+    tags:
+    - never
+    - up-services

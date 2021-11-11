@@ -1,0 +1,194 @@
+---
+
+  - name: Create script directories
+    file:
+      path: "{{ item.path }}"
+      mode: '0750'
+      state: directory
+      group: zabbix
+      owner: zabbix
+    with_items:
+    - { path: '/etc/zabbix/scripts' }
+    - { path: '/var/lib/zabbix/' }
+
+  - name: Include Variables for zabbix DB user
+    include_vars:
+      file: "vars/zabbix_db_monitoring_credentials.yml"
+    tags:
+    - always
+
+  - name: Include Variables for PSK
+    include_vars:
+      file: "vars/{{ inventory_hostname }}"
+    tags:
+    - always
+
+  - name: Put psk key and main config
+    template:
+      src: "{{ item.src }}"
+      dest: "{{ item.dest }}"
+      mode: '0640'
+      owner: zabbix
+      group: zabbix
+    with_items:
+    - { src: 'zabbix_agentd.conf.j2', dest: '/etc/zabbix/zabbix_agentd.conf' }
+    - { src: 'key.psk.j2', dest: '/etc/zabbix/key.psk' }
+    notify:
+    - Restart zabbix-agent 
+    when:
+    - inventory_hostname != 'some_host'
+
+  - name: Put main agent config for zabbix server
+    template:
+      src: "{{ item.src }}"
+      dest: "{{ item.dest }}"
+      mode: '0644'
+      owner: root
+      group: root
+    with_items:
+    - { src: 'zx_server_zabbix_agentd.conf.j2', dest: '/etc/zabbix/zabbix_agentd.conf' }
+    notify:
+    - Restart zabbix-agent 
+    when:
+    - inventory_hostname == 'some_host'
+
+  - name: Change zabbix-agent config
+    lineinfile:
+      path: /etc/zabbix/zabbix_agentd.conf
+      regexp: "{{ item.regexp }}"
+      line: "{{ item.line }}"
+    with_items:
+      - { regexp: '^Hostname=', line: "Hostname={{ inventory_hostname }}" } 
+    tags:
+    - update-config
+    notify:
+    - Restart zabbix-agent 
+    when:
+    - inventory_hostname != 'zabbix_server'
+
+  - name: Put credentials for DB monitoring
+    template:
+      src: "{{ item.src }}"
+      dest: "{{ item.dest }}"
+      mode: '0400'
+      owner: zabbix
+      group: zabbix
+    with_items:
+    - { src: '', dest: '' }
+    when:
+    - "'front_servers' in group_names or 'sql_servers' in group_names"
+    tags:
+    - update-mysql-creds
+    notify:
+    - Restart zabbix-agent
+
+  - name: Put other configs 
+    copy:
+      src: "{{ item.src }}"
+      dest: "{{ item.dest }}"
+      mode: '0640'
+      owner: zabbix
+      group: zabbix 
+    with_items:
+    - { src: 'all.conf', dest: '/etc/zabbix/zabbix_agentd.d/all.conf' }
+    - { src: 'template_db_mysql.conf', dest: '/etc/zabbix/zabbix_agentd.d/template_db_mysql.conf' }
+    - { src: 'dns-and-ssl-checks.conf', dest: '/etc/zabbix/zabbix_agentd.d/dns-and-ssl-checks.conf' }
+    notify:
+    - Restart zabbix-agent 
+
+  - name: Put scripts
+    copy:
+      src: "{{ item.src }}"
+      dest: "{{ item.dest }}"
+      mode: '0755'
+      owner: zabbix
+      group: zabbix 
+    with_items:
+    - { src: 'lmsensors.sh', dest: '/etc/zabbix/scripts/lmsensors.sh' }
+    - { src: 'smartctl-disks-discovery.pl', dest: '/etc/zabbix/scripts/smartctl-disks-discovery.pl' }
+    notify:
+    - Restart zabbix-agent 
+    tags:
+    - update-scripts
+
+  - name: Put additioanl script for zabbix-server
+    copy:
+      src: '{{ item.src }}'
+      dest: '{{ item.dest }}'
+      mode: '0755'
+      owner: zabbix
+      group: zabbix
+    with_items:
+      - { src: 'get-ssl-expires-timestamp.sh', dest: '/usr/lib/zabbix/externalscripts/get-ssl-expires-timestamp.sh' }
+      - { src: 'get-domain-expires-timestamp.sh', dest: '/usr/lib/zabbix/externalscripts/get-domain-expires-timestamp.sh' }
+      - { src: 'dummy.sh', dest: '/usr/lib/zabbix/externalscripts/dummy.sh' }
+      - { src: 'sslLeft.sh', dest: '/usr/lib/zabbix/externalscripts/sslLeft.sh' }
+    notify:
+    - Restart zabbix-agent
+    when:
+    - inventory_hostname == 'zabbix_server'
+
+  - name: Put scripts for static size monitoring
+    template:
+      src: '{{ item.src }}'
+      dest: '{{ item.dest }}'
+      mode: '0755'
+      owner: zabbix
+      group: zabbix
+    with_items:
+      - { src: 'count_static_size.sh.j2', dest: '/etc/zabbix/scripts/count_static_size.sh' }
+    when: "inventory_hostname == 'some_server'"
+    notify:
+      - Restart zabbix-agent
+    tags:
+      - update-scripts
+
+  - name: Put config to support backups monitoring
+    copy:
+      src: "{{ item.src }}"
+      dest: "{{ item.dest }}"
+      owner: root
+      group: root
+      mode: "0664"
+    with_items:
+      - { src: 'zbx_backups.conf', dest: '/etc/zabbix/zabbix_agentd.d/zbx_backups.conf' }
+    when: "inventory_hostname == 'some_server'"
+    notify:
+      - Restart zabbix-agent
+    tags:
+      - update-zabbix-config
+
+  - name: Put script for monitoring file backups on backup server. 
+    copy:
+      src: 'checkFilesBackup.sh'
+      dest: '/etc/zabbix/scripts/checkFilesBackup.sh'
+      mode: '0755'
+      owner: zabbix
+      group: zabbix
+    when: "inventory_hostname == 'some_server'"
+
+  - name: User crontab for counting static size
+    cron:
+      name: Count static size 
+      job: "ps aux | grep \"[d]u --apparent-size -sb /some_folder/static/\" || /etc/zabbix/scripts/count_static_size.sh"
+      minute: '0'
+      hour: '{{ count_static_size_script_run_hour }}'
+      user: root
+      disabled: no 
+    tags:
+      - update-cron
+    when: "inventory_hostname == 'some_server'"
+
+  - name: Put sudoers file
+    copy:
+      src: sudoers_zabbix_smartctl
+      dest: /etc/sudoers.d/sudoers_zabbix_smartctl
+      mode: '0640'
+      owner: root
+      group: root
+
+  - name: Enable zabbix-agent service
+    systemd:
+      name: zabbix-agent
+      daemon_reload: yes
+      enabled: yes

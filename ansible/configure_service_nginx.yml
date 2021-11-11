@@ -1,0 +1,6 @@
+---
+
+- hosts: some_servers
+  roles:
+    - deploy_front_nginx_in_docker
+

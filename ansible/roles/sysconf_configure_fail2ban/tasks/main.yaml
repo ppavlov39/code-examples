@@ -1,0 +1,32 @@
+---
+
+  - name: Put fail2ban config with NGINX support
+    template:
+      src: jail.local.with-nginx.j2
+      dest: /etc/fail2ban/jail.local
+      owner: root
+      group: root
+      mode: '0644'
+    when: 
+    - ansible_host != "some_server"
+    tags:
+    - configure
+
+  - name: Put fail2ban config without NGINX
+    template:
+      src: jail.local.only-auth.j2 
+      dest: /etc/fail2ban/jail.local
+      owner: root
+      group: root
+      mode: '0644'
+    when: 
+    - ansible_host != "another_server"
+    tags:
+    - configure
+
+  - name:  Restart service
+    systemd:
+      name: fail2ban
+      state: restarted
+    tags:
+    - configure

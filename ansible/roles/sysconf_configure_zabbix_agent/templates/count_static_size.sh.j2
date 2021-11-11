@@ -1,0 +1,13 @@
+#!/bin/bash
+
+echo "===================="
+echo "Start counting... $(date)"
+STATAIC_SIZE=$(du --apparent-size -sb {{ static_directory_path }} | cut -f 1)
+if [[ $STATAIC_SIZE == "" ]]; then
+  STATAIC_SIZE=0
+fi
+echo "Static size is $STATAIC_SIZE"
+echo "End counting $(date)"
+
+echo "$STATAIC_SIZE" > {{ static_size_file_path }}
+

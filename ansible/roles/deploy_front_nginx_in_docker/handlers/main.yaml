@@ -1,0 +1,9 @@
+---
+
+  - name:  Reload nginx
+    shell:
+      chdir: /opt/docker/nginx/
+      cmd: "/usr/local/bin/docker-compose exec nginx nginx -s reload"
+    when:
+    - skip_handlers | default("false") == "false"
+

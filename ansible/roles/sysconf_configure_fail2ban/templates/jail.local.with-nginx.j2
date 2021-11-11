@@ -1,0 +1,68 @@
+[DEFAULT]
+
+#
+# MISCELLANEOUS OPTIONS
+#
+
+ignorself = true
+ignoreip = 127.0.0.1/8 ::1 83.219.149.109 5.9.143.28 54.37.139.51
+bantime  = 10m
+findtime  = 5m
+maxretry = 5
+
+# "usedns" specifies if jails should trust hostnames in logs,
+#   warn when DNS lookups are performed, or ignore all hostnames in logs
+#
+# yes:   if a hostname is encountered, a DNS lookup will be performed.
+# warn:  if a hostname is encountered, a DNS lookup will be performed,
+#        but it will be logged as a warning.
+# no:    if a hostname is encountered, will not be used for banning,
+#        but it will be logged as info.
+# raw:   use raw value (no hostname), allow use it for no-host filters/actions (example user)
+usedns = no
+
+#
+# JAILS
+#
+
+#
+# SSH servers
+#
+
+[sshd]
+
+# To use more aggressive sshd modes set filter parameter "mode" in jail.local:
+# normal (default), ddos, extra or aggressive (combines all).
+# See "tests/files/logs/sshd" or "filter.d/sshd.conf" for usage example and details.
+#mode   = normal
+enabled = true
+port    = ssh
+logpath = %(sshd_log)s
+backend = %(sshd_backend)s
+
+
+#
+# HTTP servers
+#
+
+[nginx-limit-req]
+enabled = true
+port    = http,https
+logpath = %(nginx_error_log)s
+findtime = 5m
+bantime = 24h
+maxretry = 400
+
+[nginx-botsearch]
+port     = http,https
+logpath  = %(nginx_error_log)s
+maxretry = 2
+
+# Ban attackers that try to use PHP's URL-fopen() functionality
+# through GET/POST variables. - Experimental, with more than a year
+# of usage in production environments.
+
+[php-url-fopen]
+port    = http,https
+logpath = %(nginx_access_log)s
+

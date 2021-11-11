@@ -1,0 +1,33 @@
+---
+
+  - name: Add elastic repo
+    copy:
+      dest: /etc/apt/sources.list.d/elastic-6.x.list
+      src: elastic-6.x.list
+      owner: root
+      group: root
+      mode: '0644'
+
+  - name: Install requirements
+    apt:
+      pkg:
+        - apt-transport-https
+        - uuid-runtime
+        - pwgen
+        - default-jdk
+
+  - name: Add elastic key repo
+    apt_key:
+      url: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+      state: present
+
+  - name: Install Logstash
+    apt:
+      update_cache: yes
+      pkg: logstash
+
+  - name: Disable elasticsearch service
+    systemd:
+      name: logstash
+      daemon_reload: yes
+      enabled: no

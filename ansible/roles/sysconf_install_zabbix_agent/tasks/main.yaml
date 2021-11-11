@@ -1,0 +1,12 @@
+---
+
+  - name: Install Zabbix-agent
+    apt:
+      update_cache: yes
+      pkg: zabbix-agent
+
+  - name: Enable zabbix-agent service
+    systemd:
+      name: zabbix-agent
+      daemon_reload: yes
+      enabled: yes

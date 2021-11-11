@@ -1,0 +1,11 @@
+---
+- hosts: some_server
+  roles:
+    - sysconf_install_common_pkgs
+    - sysconf_install_fail2ban
+    - sysconf_configure_fail2ban
+    - sysconf_install_logstash
+    - sysconf_configure_logstash
+    - sysconf_install_zabbix_agent
+    - sysconf_configure_firewall
+    - sysconf_configure_zabbix_agent

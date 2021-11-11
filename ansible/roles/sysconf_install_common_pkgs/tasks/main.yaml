@@ -1,0 +1,32 @@
+---
+  - name: Install packets
+    apt:
+      update_cache: yes
+      pkg:
+        - vim
+        - atop
+        - htop
+        - curl
+        - tmux
+        - mc
+        - ntpdate
+        - net-tools
+        - lsb-release
+        - smartmontools
+        - dnsutils
+        - lm-sensors
+        - sudo
+
+  - name: Disable atop service
+    systemd:
+      name: atop
+      enabled: no
+      state: stopped
+    ignore_errors: yes
+
+  - name: Disable atop accounting service
+    systemd:
+      name: atopacct.service
+      enabled: no
+      state: stopped
+    ignore_errors: yes

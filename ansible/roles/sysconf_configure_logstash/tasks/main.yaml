@@ -1,0 +1,12 @@
+---
+
+  - name: Put logstash config
+    template:
+      src: filebeat-input.conf.j2
+      dest: /etc/logstash/conf.d/filebeat-input.conf
+      owner: root
+      group: root
+      mode: '0644'
+    notify:
+    - Enable and start logstash
+

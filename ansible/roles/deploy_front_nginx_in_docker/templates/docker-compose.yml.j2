@@ -1,0 +1,18 @@
+version: '3.7'
+services:
+  nginx:
+    image: 
+    network_mode: "host"
+    restart: always
+    healthcheck:
+      test: curl -I http://{{ server_ip }}/status.nginx
+      timeout: 10s
+      retries: 6
+      interval: 30s
+      start_period: 120m
+    volumes:
+      - { type: bind, source: /opt/docker/nginx/ssl/, target: /ssl/, bind: { propagation: private } }
+      - { type: bind, source: /opt/docker/nginx/configs/, target: /etc/nginx/configs, bind: { propagation: private } }
+      - { type: bind, source: /opt/docker/nginx/configs/sites-available/, target: /etc/nginx/sites-available/, bind: { propagation: private } }
+      - { type: bind, source: /var/log/nginx/, target: /var/log/nginx/, bind: { propagation: private } }
+    command: nginx -c /etc/nginx/configs/nginx.conf -g "daemon off";

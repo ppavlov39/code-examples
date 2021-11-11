@@ -1,0 +1,4 @@
+---
+
+  dependencies:
+  - { role: sysconf_install_zabbix_repo }

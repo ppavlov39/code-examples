@@ -1,0 +1,18 @@
+---
+
+  - name: Get OS LSB release name 
+    shell: lsb_release -sc
+    register: lsb_release
+
+  - name: Install zabbix repo in Ubuntu
+    apt:
+      deb: "https://repo.zabbix.com/zabbix/4.4/ubuntu/pool/main/z/zabbix-release/zabbix-release_4.4-1+{{ lsb_release.stdout }}_all.deb"
+      state: present
+    when: ansible_distribution == "Ubuntu"
+
+  - name: Install zabbix repo in Debian 10
+    apt:
+      state: present
+      deb: "https://repo.zabbix.com/zabbix/4.0/debian/pool/main/z/zabbix-release/zabbix-release_4.0-3+{{ lsb_release.stdout }}_all.deb"
+    when: ansible_distribution == "Debian"
+

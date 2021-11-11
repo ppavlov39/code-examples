@@ -1,0 +1,37 @@
+# Sample Logstash configuration for creating a simple
+# Beats -> Logstash -> Elasticsearch pipeline.
+
+input {
+  beats {
+    port => "5044"
+    host => "0.0.0.0"
+  }
+}
+
+filter {
+  mutate {
+    rename => { "source" => "[beat][source]" }
+    rename => { "[log][file][path]" => "[beat][file_path]" }
+    rename => { "beat" => "filebeat" }
+    rename => { "[host][name]" => "host" }
+    remove_field => [ "log" ]
+    remove_field => [ "tags" ]
+  }
+}
+output {
+  if [filebeat][file_path] =~ "^\/logs\/nginx\/" {
+    file {
+      path => "/logs/%{[filebeat][name]}%{[filebeat][file_path]}"
+      codec => line { format => "%{message}"}
+    }
+  }
+  gelf {
+    host => "x.x.x.x"
+    full_message => ""
+  }
+#  if [filebeat][file_path] =~ "^\/logs\/syslog" {
+#    file {
+#      path => "/tmp/1"
+#    }
+#  }
+}
